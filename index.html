@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#181521">
+<meta property="og:title" content="Крутославик">
+<meta property="og:description" content="Славик катится кувырком, собирает девятки и наггетсы и обходит воду и стейки.">
+<meta property="og:type" content="website">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<title>Крутославик</title>
+<style>
+  :root{
+    --asphalt:#3b3f4a;
+    --asphalt-2:#333743;
+    --sky-top:#2b2140;
+    --sky-bot:#f0784a;
+    --malina:#d61f52;
+    --pink:#f2568a;
+    --gold:#ffc233;
+    --ink:#181521;
+    --bone:#fff4e2;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;overflow:hidden;background:var(--ink);
+    font-family:"Arial Black","Helvetica Neue",Impact,sans-serif;
+    -webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
+  #wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center}
+  #stage{position:relative;width:100%;height:100%;max-width:560px;overflow:hidden;
+    box-shadow:0 0 0 1px rgba(0,0,0,.5)}
+  canvas{display:block;width:100%;height:100%}
+
+  /* ---- HUD ---- */
+  #hud{position:absolute;inset:0;pointer-events:none;padding:14px 16px;
+    display:flex;flex-direction:column;gap:10px;color:var(--bone)}
+  .row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+  #score{font-size:34px;letter-spacing:-1px;line-height:.9;
+    text-shadow:3px 3px 0 rgba(0,0,0,.45)}
+  #score small{display:block;font-size:11px;font-weight:400;letter-spacing:2px;
+    font-family:system-ui,sans-serif;opacity:.65;text-shadow:none;margin-top:3px}
+  #lives{display:flex;gap:5px}
+  .life{width:15px;height:26px;border-radius:3px 3px 6px 6px;background:var(--malina);
+    box-shadow:inset 0 -7px 0 rgba(0,0,0,.25), 2px 2px 0 rgba(0,0,0,.4);position:relative}
+  .life::before{content:"";position:absolute;top:-6px;left:4px;width:7px;height:7px;
+    background:var(--malina);border-radius:2px}
+  .life.off{background:#5a5566;opacity:.4}
+  #gwrap{width:100%}
+  #gbar{height:14px;background:rgba(0,0,0,.4);border:2px solid rgba(255,244,226,.25);
+    border-radius:2px;overflow:hidden}
+  #gfill{height:100%;width:0%;background:linear-gradient(90deg,#ffe08a,var(--gold),#ff7a2f);
+    transition:width .12s linear}
+  #glab{font-family:system-ui,sans-serif;font-size:11px;letter-spacing:2px;
+    opacity:.7;margin-bottom:4px;font-weight:600}
+  #mute,#pausebtn{pointer-events:auto;position:absolute;bottom:14px;width:40px;height:40px;
+    border:0;border-radius:50%;background:rgba(0,0,0,.4);color:var(--bone);
+    font-size:17px;cursor:pointer;font-family:system-ui}
+  #mute{right:14px}
+  #pausebtn{right:62px;font-size:13px;letter-spacing:1px}
+
+  /* ---- Экраны ---- */
+  .screen{position:absolute;inset:0;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;gap:18px;text-align:center;padding:26px;
+    background:rgba(24,21,33,.9);color:var(--bone);backdrop-filter:blur(3px)}
+  .screen.hide{display:none}
+  h1{font-size:clamp(40px,13vw,72px);line-height:.85;letter-spacing:-3px;
+    color:var(--gold);text-shadow:4px 4px 0 var(--malina), 8px 8px 0 rgba(0,0,0,.4);
+    transform:rotate(-4deg)}
+  .tag{font-family:system-ui,sans-serif;font-weight:500;font-size:14px;opacity:.75;
+    max-width:34ch;line-height:1.5}
+  .legend{font-family:system-ui,sans-serif;font-size:13px;text-align:left;
+    display:grid;grid-template-columns:1fr 1fr;gap:10px 16px}
+  .li{display:flex;align-items:center;gap:8px;line-height:1.3}
+  .ic{width:44px;height:44px;flex:0 0 44px}
+  .legend b{font-weight:700;font-size:14px;color:#ffe08a}
+  .legend .bad b{color:#ff9d9d}
+  .legend span{opacity:.9}
+  @media (max-width:400px){ .legend{grid-template-columns:1fr} }
+  button.go{pointer-events:auto;border:0;cursor:pointer;background:var(--gold);
+    color:var(--ink);font-family:inherit;font-size:22px;padding:16px 40px;border-radius:4px;
+    box-shadow:5px 5px 0 var(--malina);letter-spacing:0}
+  button.go:active{transform:translate(3px,3px);box-shadow:2px 2px 0 var(--malina)}
+  #rank{font-size:clamp(22px,6vw,30px);color:var(--gold);line-height:1.1;max-width:16ch}
+  #final{font-size:64px;line-height:.9}
+  #final small{display:block;font-size:12px;font-family:system-ui,sans-serif;
+    font-weight:400;letter-spacing:2px;opacity:.6;margin-top:6px}
+  #best{font-family:system-ui,sans-serif;font-size:13px;opacity:.6}
+  .keys{font-family:system-ui,sans-serif;font-size:12px;opacity:.5}
+
+  /* ---- Ачивки ---- */
+  #achpop{position:absolute;left:50%;top:100px;transform:translate(-50%,-14px);
+    opacity:0;pointer-events:none;background:var(--gold);color:var(--ink);
+    padding:9px 18px;border-radius:4px;box-shadow:5px 5px 0 var(--malina);
+    font-family:system-ui,sans-serif;text-align:center;max-width:80%;
+    transition:opacity .18s,transform .18s}
+  #achpop.on{opacity:1;transform:translate(-50%,0)}
+  #achpop em{font-style:normal;display:block;font-size:9px;letter-spacing:3px;
+    font-weight:800;opacity:.55}
+  #achpop b{display:block;font-size:15px;font-weight:800;line-height:1.2}
+  #achpop i{font-style:normal;font-size:11px;opacity:.7}
+  h2.ah{font-size:36px;color:var(--gold);letter-spacing:-1px;
+    text-shadow:3px 3px 0 var(--malina)}
+  #achlist{display:grid;gap:7px;width:100%;max-width:430px;max-height:58vh;
+    overflow-y:auto;font-family:system-ui,sans-serif;text-align:left;padding-right:4px}
+  .ac{display:flex;gap:10px;align-items:flex-start;padding:9px 12px;border-radius:4px;
+    background:rgba(255,255,255,.05)}
+  .ac .m{font-size:17px;line-height:1.1;opacity:.35}
+  .ac b{font-size:13.5px;display:block;font-weight:700}
+  .ac span{font-size:11.5px;opacity:.6}
+  .ac.got{background:rgba(255,194,51,.14);box-shadow:inset 0 0 0 2px rgba(255,194,51,.45)}
+  .ac.got .m{opacity:1}
+  .ac.got b{color:var(--gold)}
+  button.ghost{pointer-events:auto;border:0;cursor:pointer;background:transparent;
+    color:var(--bone);font-family:system-ui,sans-serif;font-weight:700;font-size:13px;
+    padding:10px 20px;border-radius:4px;box-shadow:inset 0 0 0 2px rgba(255,244,226,.3)}
+  #newach{font-family:system-ui,sans-serif;font-size:13px;display:grid;gap:5px;
+    color:var(--gold);font-weight:700}
+  #runstats{font-family:system-ui,sans-serif;font-size:12.5px;opacity:.7;
+    line-height:1.7;max-width:30ch}
+  #runstats b{color:var(--bone);font-weight:700}
+</style>
+</head>
+<body>
+<div id="wrap"><div id="stage">
+  <canvas id="c"></canvas>
+
+  <div id="hud">
+    <div class="row">
+      <div id="score">0<small>очков</small></div>
+      <div id="lives"></div>
+    </div>
+    <div id="gwrap">
+      <div id="glab">градус</div>
+      <div id="gbar"><div id="gfill"></div></div>
+    </div>
+    <button id="pausebtn">❚❚</button>
+    <button id="mute">♪</button>
+  </div>
+
+  <div class="screen" id="start">
+    <h1>КРУТО<br>СЛАВИК</h1>
+    <p class="tag">Славик не бегает. Славик катится кувырком. Так быстрее и не так стыдно.</p>
+    <div class="legend">
+      <div class="li"><canvas class="ic" data-t="beer"></canvas>
+        <span><b>Девятка</b><br>очки и градус</span></div>
+      <div class="li"><canvas class="ic" data-t="nug"></canvas>
+        <span><b>Наггетсы</b><br>закуска, держит темп</span></div>
+      <div class="li"><canvas class="ic" data-t="water"></canvas>
+        <span class="bad"><b>Вода</b><br>трезвеет, комбо всё</span></div>
+      <div class="li"><canvas class="ic" data-t="steak"></canvas>
+        <span class="bad"><b>Стейк</b><br>белок, ЗОЖ, минус жизнь</span></div>
+    </div>
+    <button class="go" id="btn1">ПОКАТИЛИ</button>
+    <button class="ghost" id="btnAch">АЧИВКИ</button>
+    <p class="keys">← → или A D · на телефоне — тапни по стороне · Esc — пауза</p>
+  </div>
+
+  <div id="achpop"></div>
+
+  <div class="screen hide" id="pause">
+    <h2 class="ah">ПАУЗА</h2>
+    <p class="tag">Славик подождёт. Он всё равно забыл, куда катился.</p>
+    <button class="go" id="btnResume">ПРОДОЛЖИТЬ</button>
+    <button class="ghost" id="btnMenu">В ГЛАВНОЕ МЕНЮ</button>
+  </div>
+
+  <div class="screen hide" id="achs">
+    <h2 class="ah">АЧИВКИ</h2>
+    <div id="achlist"></div>
+    <button class="ghost" id="btnBack">НАЗАД</button>
+  </div>
+
+  <div class="screen hide" id="over">
+    <div id="rank"></div>
+    <div id="final">0<small>итог</small></div>
+    <div id="best"></div>
+    <div id="runstats"></div>
+    <div id="newach"></div>
+    <button class="go" id="btn2">ЕЩЁ РАЗОК</button>
+    <button class="ghost" id="btnAch2">АЧИВКИ</button>
+    <button class="ghost" id="btnMenu2">В ГЛАВНОЕ МЕНЮ</button>
+  </div>
+</div></div>
+
+<script>
+(() => {
+/* ---------- Telegram Mini App ---------- */
+const TG = (window.Telegram && window.Telegram.WebApp) ? window.Telegram.WebApp : null;
+if(TG){
+  try{ TG.ready(); TG.expand(); }catch(e){}
+  // без этого свайп вниз закрывает приложение прямо посреди забега
+  try{ TG.disableVerticalSwipes && TG.disableVerticalSwipes(); }catch(e){}
+  try{ TG.setHeaderColor('#181521'); TG.setBackgroundColor('#181521'); }catch(e){}
+  try{ TG.lockOrientation && TG.lockOrientation(); }catch(e){}
+  try{ TG.enableClosingConfirmation && TG.enableClosingConfirmation(); }catch(e){}
+}
+function haptic(kind){
+  if(!TG || !TG.HapticFeedback) return;
+  try{
+    if(kind==='error')      TG.HapticFeedback.notificationOccurred('error');
+    else if(kind==='ok')    TG.HapticFeedback.notificationOccurred('success');
+    else                    TG.HapticFeedback.impactOccurred(kind);
+  }catch(e){}
+}
+
+const cv=document.getElementById('c'), ctx=cv.getContext('2d');
+const elScore=document.getElementById('score'), elLives=document.getElementById('lives');
+const elG=document.getElementById('gfill'), scStart=document.getElementById('start'),
+      scOver=document.getElementById('over'), elRank=document.getElementById('rank'),
+      elFinal=document.getElementById('final'), elBest=document.getElementById('best');
+
+let W=0,H=0,HOR=0,GROUND=0,CX=0;
+function resize(){
+  const r=cv.getBoundingClientRect(), dpr=Math.min(window.devicePixelRatio||1,2);
+  cv.width=r.width*dpr; cv.height=r.height*dpr;
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  W=r.width; H=r.height; HOR=H*0.30; GROUND=H*0.80; CX=W/2;
+}
+addEventListener('resize',resize); resize();
+
+/* ---------- перспектива ---------- */
+const DMAX=100;
+function proj(d){
+  const t=Math.max(0,Math.min(1,1-d/DMAX));
+  const p=Math.pow(t,2.7);
+  return {p, y:HOR+(GROUND-HOR)*p, half:12+(W*0.47-12)*p, sc:0.05+0.95*p};
+}
+const laneX=(lane,half)=>CX+(lane-1)*half*0.60;
+
+/* ---------- звук ---------- */
+let AC=null, muted=false;
+function beep(f,dur,type,vol){
+  if(muted) return;
+  try{
+    AC = AC || new (window.AudioContext||window.webkitAudioContext)();
+    const o=AC.createOscillator(), g=AC.createGain();
+    o.type=type||'square'; o.frequency.value=f;
+    g.gain.setValueAtTime(vol||0.06,AC.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001,AC.currentTime+dur);
+    o.connect(g); g.connect(AC.destination); o.start(); o.stop(AC.currentTime+dur);
+  }catch(e){}
+}
+document.getElementById('mute').onclick=e=>{
+  muted=!muted; e.target.textContent=muted?'✕':'♪'; e.target.blur();
+};
+
+/* тот самый звук на стейк: пила + дрожание частоты + low-pass */
+function fart(){
+  if(muted) return;
+  try{
+    AC = AC || new (window.AudioContext||window.webkitAudioContext)();
+    const t=AC.currentTime, dur=0.45;
+    const o=AC.createOscillator(); o.type='sawtooth';
+    o.frequency.setValueAtTime(155,t);
+    o.frequency.exponentialRampToValueAtTime(62,t+dur*0.7);
+    o.frequency.exponentialRampToValueAtTime(36,t+dur);
+    // дрожание — то самое «бррр», к концу замедляется
+    const lfo=AC.createOscillator(); lfo.type='square';
+    lfo.frequency.setValueAtTime(30,t);
+    lfo.frequency.linearRampToValueAtTime(11,t+dur);
+    const lg=AC.createGain();
+    lg.gain.setValueAtTime(52,t);
+    lg.gain.linearRampToValueAtTime(14,t+dur);
+    lfo.connect(lg); lg.connect(o.frequency);
+    const f=AC.createBiquadFilter(); f.type='lowpass'; f.Q.value=7;
+    f.frequency.setValueAtTime(760,t);
+    f.frequency.exponentialRampToValueAtTime(200,t+dur);
+    const g=AC.createGain();
+    g.gain.setValueAtTime(0.0001,t);
+    g.gain.exponentialRampToValueAtTime(0.17,t+0.035);
+    g.gain.exponentialRampToValueAtTime(0.10,t+0.20);
+    g.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.connect(f); f.connect(g); g.connect(AC.destination);
+    o.start(t); lfo.start(t);
+    o.stop(t+dur+0.02); lfo.stop(t+dur+0.02);
+  }catch(e){}
+}
+
+/* ---------- состояние ---------- */
+const TYPES={
+  beer  :{good:1,score:10,grad: 14,w:30},
+  nug   :{good:1,score: 5,grad:  5,w:28},
+  water :{good:0,score:-5,grad:-30,w:21},
+  steak :{good:0,score: 0,grad:  0,w:21}
+};
+const POOL=[]; for(const k in TYPES) for(let i=0;i<TYPES[k].w;i++) POOL.push(k);
+
+let S=null, running=false, paused=false, best=0;
+function reset(){
+  S={lane:1,px:CX,vx:0,roll:0,score:0,lives:3,grad:20,combo:0,
+     items:[],toasts:[],dist:0,spawn:0,shake:0,flash:0,flashCol:'#fff',t:0,speed:26,
+     dead:false, newAch:[],
+     st:{beer:0,nug:0,water:0,steak:0,lanes:0,rolls:0,maxCombo:0,
+         gradFull:0,dry:0,noSteak:true,noBeer:true}};
+}
+
+/* ---------- ввод ---------- */
+function move(dir){
+  if(!running||paused) return;
+  const n=Math.max(0,Math.min(2,S.lane+dir));
+  if(n!==S.lane){ S.lane=n; S.st.lanes++; beep(320,0.05,'square',0.03); }
+}
+addEventListener('keydown',e=>{
+  if(e.key==='Escape'||e.key==='p'||e.key==='P'||e.key==='з'||e.key==='З'){
+    if(running) setPause(!paused);
+    return;
+  }
+  if(e.key==='ArrowLeft'||e.key==='a'||e.key==='A'||e.key==='ф'||e.key==='Ф') move(-1);
+  if(e.key==='ArrowRight'||e.key==='d'||e.key==='D'||e.key==='в'||e.key==='В') move(1);
+  if(e.code==='Space'&&!running) start();
+});
+// свернул вкладку — Славик замирает
+addEventListener('visibilitychange',()=>{ if(document.hidden && running) setPause(true); });
+let tx=null;
+cv.addEventListener('pointerdown',e=>{ tx=e.clientX;
+  const r=cv.getBoundingClientRect();
+  move(e.clientX-r.left < r.width/2 ? -1 : 1);
+});
+cv.addEventListener('pointerup',e=>{
+  if(tx!==null && Math.abs(e.clientX-tx)>40){} tx=null;
+});
+
+/* ---------- спавн ---------- */
+function spawn(){
+  const lanes=[0,1,2], used=[];
+  const n = Math.random()<0.38 ? 2 : 1;
+  for(let i=0;i<n;i++){
+    const idx=Math.floor(Math.random()*lanes.length);
+    const ln=lanes.splice(idx,1)[0];
+    let ty=POOL[Math.floor(Math.random()*POOL.length)];
+    // не запираем игрока: минимум одна полоса без «плохого»
+    if(i===1 && !TYPES[ty].good && !TYPES[used[0]].good) ty='beer';
+    used.push(ty);
+    S.items.push({lane:ln,type:ty,d:DMAX,spin:Math.random()*6});
+  }
+}
+
+function toast(text,col,lane){
+  const {half}=proj(6);
+  S.toasts.push({text,col,x:laneX(lane,half),y:GROUND-70,life:1});
+}
+
+/* ---------- логика ---------- */
+function update(dt){
+  S.t+=dt;
+  const gk=S.grad/100;
+  S.speed = 26 + S.dist*0.0009 + gk*16;
+  S.dist += S.speed*dt;
+  S.grad = Math.max(0, S.grad - 3.2*dt);
+
+  // пружина: чем пьянее, тем сильнее заносит
+  const {half}=proj(0);
+  const target=laneX(S.lane,half);
+  const damp = 13 - gk*8.5;
+  S.vx += (target-S.px)*95*dt - S.vx*damp*dt;
+  S.px += S.vx*dt;
+  S.roll += (S.speed*0.145 + Math.abs(S.vx)*0.004)*dt*1.7;
+
+  S.spawn -= S.speed*dt;
+  if(S.spawn<=0){ spawn(); S.spawn = 26 - Math.min(9, S.dist*0.0006); }
+
+  const drunkX = Math.sin(S.t*3.1)*gk*14 + Math.sin(S.t*7.3)*gk*5;
+  const heroX = S.px + drunkX;
+
+  for(let i=S.items.length-1;i>=0;i--){
+    const it=S.items[i];
+    it.d -= S.speed*dt; it.spin += dt*2;
+    if(it.d<=2.2){
+      const pr=proj(Math.max(it.d,0));
+      const ix=laneX(it.lane,pr.half);
+      if(Math.abs(ix-heroX) < 58) hit(it);
+      S.items.splice(i,1);
+    }
+  }
+  for(let i=S.toasts.length-1;i>=0;i--){
+    const t=S.toasts[i]; t.life-=dt*1.4; t.y-=46*dt;
+    if(t.life<=0) S.toasts.splice(i,1);
+  }
+  S.shake=Math.max(0,S.shake-dt*4);
+  S.flash=Math.max(0,S.flash-dt*3);
+
+  S.st.rolls=Math.floor(S.roll/(Math.PI*2));
+  S.st.dry+=dt;
+  S.st.gradFull = S.grad>=99 ? S.st.gradFull+dt : 0;
+  checkAch();
+}
+
+function hit(it){
+  const T=TYPES[it.type];
+  if(T.good){
+    S.combo++;
+    S.st.maxCombo=Math.max(S.st.maxCombo,S.combo);
+    if(it.type==='beer'){ S.st.beer++; S.st.noBeer=false; } else S.st.nug++;
+    const mult = 1 + Math.floor(S.grad/25);
+    const pts = T.score*mult + Math.floor(S.combo/5)*2;
+    S.score += pts;
+    S.grad = Math.min(100, S.grad+T.grad);
+    toast('+'+pts, '#ffe08a', it.lane);
+    beep(it.type==='beer'?660:520,0.08,'square',0.05); haptic('light');
+    if(S.combo===10) toast('РАЗОГНАЛСЯ','#8ce27a',it.lane);
+  } else if(it.type==='water'){
+    S.combo=0; S.score=Math.max(0,S.score-5);
+    S.st.water++; S.st.dry=0;
+    S.grad=Math.max(0,S.grad+T.grad);
+    S.flash=1; S.flashCol='#79c8ff'; S.shake=0.5;
+    toast('ТРЕЗВОСТЬ!','#79c8ff',it.lane);
+    beep(140,0.25,'sine',0.07); haptic('medium');
+  } else {
+    S.combo=0; S.lives--;
+    S.st.steak++; S.st.noSteak=false;
+    S.grad=Math.max(0,S.grad-15);
+    S.flash=1; S.flashCol='#ff6b6b'; S.shake=1;
+    toast('БЕЛОК!','#ff8f8f',it.lane);
+    fart(); haptic('error');
+    if(S.lives<=0) gameOver();
+  }
+}
+
+/* ---------- отрисовка мира ---------- */
+function drawWorld(){
+  // небо
+  const sky=ctx.createLinearGradient(0,0,0,HOR);
+  sky.addColorStop(0,'#2b2140'); sky.addColorStop(.6,'#7b3a63'); sky.addColorStop(1,'#f0784a');
+  ctx.fillStyle=sky; ctx.fillRect(0,0,W,HOR+2);
+  // солнце
+  ctx.fillStyle='#ffd36b'; ctx.beginPath(); ctx.arc(CX,HOR+6,54,0,7); ctx.fill();
+  // панельки
+  ctx.fillStyle='rgba(30,22,44,.85)';
+  for(let i=0;i<9;i++){
+    const bw=W/9, bx=i*bw, bh=26+((i*37)%44);
+    ctx.fillRect(bx+3,HOR-bh,bw-6,bh);
+  }
+  // земля
+  ctx.fillStyle='#2c2a3a'; ctx.fillRect(0,HOR,W,H-HOR);
+
+  // дорога полосами (эффект скорости)
+  const step=3.2, off=S.dist%(step*2);
+  for(let d=DMAX; d>0; d-=step){
+    const dd=d-off;
+    const a=proj(Math.max(dd,0)), b=proj(Math.max(dd-step,0));
+    ctx.fillStyle = (Math.floor((dd+S.dist)/step)%2===0) ? '#3b3f4a' : '#353948';
+    ctx.beginPath();
+    ctx.moveTo(CX-a.half,a.y); ctx.lineTo(CX+a.half,a.y);
+    ctx.lineTo(CX+b.half,b.y); ctx.lineTo(CX-b.half,b.y);
+    ctx.closePath(); ctx.fill();
+  }
+  // разметка
+  for(const k of [-0.5,0.5]){
+    for(let d=DMAX; d>0; d-=2.6){
+      const dd=d-(S.dist%5.2);
+      if(Math.floor((dd+S.dist)/2.6)%2) continue;
+      const a=proj(Math.max(dd,0)), b=proj(Math.max(dd-2.6,0));
+      if(a.p<0.02) continue;
+      const wA=Math.max(1,3*a.p), wB=Math.max(1,3*b.p);
+      ctx.fillStyle='rgba(255,244,226,'+(0.15+0.5*a.p)+')';
+      ctx.beginPath();
+      ctx.moveTo(CX+k*a.half*1.2-wA,a.y); ctx.lineTo(CX+k*a.half*1.2+wA,a.y);
+      ctx.lineTo(CX+k*b.half*1.2+wB,b.y); ctx.lineTo(CX+k*b.half*1.2-wB,b.y);
+      ctx.closePath(); ctx.fill();
+    }
+  }
+  // бордюры + фонари
+  for(let d=DMAX; d>0; d-=6){
+    const dd=d-(S.dist%6), a=proj(Math.max(dd,0));
+    if(a.p<0.015) continue;
+    const h=34*a.p;
+    ctx.fillStyle='#565068';
+    ctx.fillRect(CX-a.half-6*a.p, a.y-h, 5*a.p+1, h);
+    ctx.fillRect(CX+a.half+1*a.p, a.y-h, 5*a.p+1, h);
+    ctx.fillStyle='#ffcf7a';
+    ctx.fillRect(CX-a.half-8*a.p, a.y-h-4*a.p, 9*a.p, 4*a.p);
+    ctx.fillRect(CX+a.half, a.y-h-4*a.p, 9*a.p, 4*a.p);
+  }
+}
+
+/* ---------- предметы ---------- */
+function shadow(x,y,s){
+  ctx.fillStyle='rgba(0,0,0,.35)';
+  ctx.beginPath(); ctx.ellipse(x,y+4*s,26*s,8*s,0,0,7); ctx.fill();
+}
+function drawItem(it){
+  const pr=proj(Math.max(it.d,0));
+  if(pr.p<0.012) return;
+  const x=laneX(it.lane,pr.half), y=pr.y, s=pr.sc*1.15;
+  shadow(x,y,s);
+  ctx.save(); ctx.translate(x,y-26*s); ctx.scale(s,s);
+  ctx.rotate(Math.sin(it.spin)*0.16);
+  drawShape(ctx,it.type);
+  ctx.restore();
+}
+function rr(g,x,y,w,h,r){
+  g.beginPath();
+  g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r);
+  g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath();
+}
+
+/* Формы предметов. Рисуются вокруг (0,0) в единичном масштабе,
+   поэтому одна и та же функция работает и на дороге, и в правилах. */
+function drawShape(g,type){
+  g.lineJoin='round'; g.lineWidth=2.4; g.strokeStyle='rgba(0,0,0,.6)';
+
+  if(type==='beer'){                      // пивная «девятка»: зелёное стекло, синяя этикетка
+    g.fillStyle='#2e6b2c';
+    rr(g,-11,-4,22,30,5); g.fill(); g.stroke();
+    rr(g,-4.5,-27,9,25,3); g.fill(); g.stroke();
+    g.fillStyle='#e0c05a'; rr(g,-5.5,-31,11,6,2); g.fill(); g.stroke();
+    g.fillStyle='#f2ecdc'; rr(g,-11,3,22,17,1.5); g.fill();
+    g.fillStyle='#1c4a86'; g.fillRect(-11,3,22,4); g.fillRect(-11,16,22,4);
+    g.fillStyle='#1c4a86';
+    g.font='700 13px "Arial Black",Arial,sans-serif';
+    g.textAlign='center'; g.textBaseline='middle';
+    g.fillText('9',0,11.5);
+    g.fillStyle='rgba(255,255,255,.35)'; g.fillRect(-8,-2,3.5,5);
+    g.fillRect(-8,20,3.5,10);
+
+  } else if(type==='nug'){                // коробка наггетсов, три штуки торчат
+    g.fillStyle='#e0a13c';
+    for(const n of [[-8,-17,7.5],[2,-21,8],[10,-15,7]]){
+      g.beginPath();
+      g.ellipse(n[0],n[1],n[2],n[2]*0.72,n[0]*0.05,0,7);
+      g.fill(); g.stroke();
+    }
+    g.fillStyle='#f7c96b';
+    g.beginPath(); g.arc(-9,-19,2.2,0,7); g.fill();
+    g.beginPath(); g.arc(3,-22,2,0,7); g.fill();
+
+    g.fillStyle='#c8202a';                 // сама коробка
+    g.beginPath();
+    g.moveTo(-16,-8); g.lineTo(16,-8); g.lineTo(11,20); g.lineTo(-11,20);
+    g.closePath(); g.fill(); g.stroke();
+    g.fillStyle='#ffc233';                 // жёлтая полоса
+    g.beginPath();
+    g.moveTo(-14.5,0); g.lineTo(14.5,0); g.lineTo(13.2,7); g.lineTo(-13.2,7);
+    g.closePath(); g.fill();
+    g.fillStyle='rgba(0,0,0,.18)';         // боковая грань для объёма
+    g.beginPath();
+    g.moveTo(9,-8); g.lineTo(16,-8); g.lineTo(11,20); g.lineTo(6,20);
+    g.closePath(); g.fill();
+    g.strokeStyle='rgba(0,0,0,.6)'; g.lineWidth=2.4;
+    g.beginPath(); g.moveTo(-16,-8); g.lineTo(16,-8); g.stroke();
+
+  } else if(type==='water'){              // питьевая вода: прозрачная, скучная
+    g.fillStyle='rgba(160,220,255,.9)';
+    rr(g,-10,-8,20,28,4); g.fill(); g.stroke();
+    rr(g,-4,-25,8,18,2); g.fill(); g.stroke();
+    g.fillStyle='#2f7fc4'; rr(g,-5,-30,10,6,2); g.fill(); g.stroke();
+    g.fillStyle='#eaf6ff'; rr(g,-10,2,20,11,1); g.fill();
+    g.fillStyle='#2f7fc4';                 // капля на этикетке
+    g.beginPath();
+    g.moveTo(0,3.5); g.quadraticCurveTo(5,8,0,11.5); g.quadraticCurveTo(-5,8,0,3.5);
+    g.fill();
+    g.fillStyle='rgba(255,255,255,.8)'; g.fillRect(-7,-4,3,5); g.fillRect(-7,14,3,5);
+
+  } else {                                 // стейк с косточкой
+    g.fillStyle='#9c3a3a'; g.beginPath();
+    g.moveTo(-18,0); g.quadraticCurveTo(-16,-15,0,-15);
+    g.quadraticCurveTo(19,-15,17,2); g.quadraticCurveTo(15,16,-3,14);
+    g.quadraticCurveTo(-19,13,-18,0); g.closePath(); g.fill(); g.stroke();
+    g.fillStyle='#6d2626';
+    g.beginPath(); g.ellipse(-1,-1,9,6,0.3,0,7); g.fill();
+    g.strokeStyle='#c96a5a'; g.lineWidth=2;
+    g.beginPath(); g.moveTo(-11,-6); g.lineTo(-4,-9); g.stroke();
+    g.beginPath(); g.moveTo(-9,3); g.lineTo(-2,1); g.stroke();
+    g.strokeStyle='rgba(0,0,0,.6)'; g.lineWidth=2.4;
+    g.fillStyle='#f2e4cf';
+    g.beginPath(); g.arc(15,7,6,0,7); g.fill(); g.stroke();
+  }
+}
+
+/* иконки предметов на экране правил — те же формы, что и на дороге */
+function paintIcon(cn,type){
+  const dpr=Math.min(window.devicePixelRatio||1,2);
+  cn.width=54*dpr; cn.height=54*dpr;
+  const g=cn.getContext('2d');
+  g.setTransform(dpr,0,0,dpr,0,0);
+  g.translate(27,30); g.scale(0.8,0.8);
+  drawShape(g,type);
+}
+
+/* ---------- Славик ----------
+   Кувырок вперёд, камера строго сзади.
+   Тело — точки в 3D (+x вправо, +y вверх, +z на камеру),
+   вращаем вокруг горизонтальной оси X. Катимся ОТ камеры:
+   спина едет вниз по ближней стороне, подошвы выезжают сверху. */
+const SKIN='#e9b98d',  SKIN_D='#c99a70',
+      SHIRT='#fcf9f2', SHIRT_D='#cdc5b6',
+      PANTS='#dcc49c', PANTS_D='#b49a72',
+      HAIR='#f2d067',  HAIR_D='#c39b34',
+      SHOE='#2f3550',  SHOE_D='#20253c', SOLE='#efe7d6',
+      LINE='#241d2b';
+
+function drawSlavik(x,yBase,ang){
+  const ca=Math.cos(ang), sa=Math.sin(ang);
+  const bob=36+Math.sin(ang*2)*4;
+  function P(px,py,pz){
+    const y2 =  py*ca + pz*sa;
+    const z2 = -py*sa + pz*ca;
+    const s  = 1 + z2/440;
+    return {x:x+px*s, y:yBase-bob-y2*s, z:z2, s:s};
+  }
+  // плотная группировка: колени к груди, пятки под себя, голова прижата
+  const J={
+    torso:P(  0,  7, 12), hips :P(  0,-11, 15), head :P(  0,-17,-11),
+    shL  :P(-17, 13,  7), shR  :P( 17, 13,  7),
+    hipL :P(-11, -8, 12), hipR :P( 11, -8, 12),
+    kneeL:P(-15, 15,-11), kneeR:P( 15, 15,-11),
+    footL:P(-12,-11, -9), footR:P( 12,-11, -9),
+    handL:P(-17,  3,-13), handR:P( 17,  3,-13)
+  };
+
+  // тень «дышит» в такт касанию земли
+  const touch=(1+Math.cos(ang*2))/2;
+  ctx.fillStyle='rgba(0,0,0,'+(0.2+0.18*touch)+')';
+  ctx.beginPath(); ctx.ellipse(x,yBase+5,29+9*touch,9,0,0,7); ctx.fill();
+
+  ctx.lineJoin='round'; ctx.lineCap='round';
+  const shade=(z,c,d)=> z<0 ? d : c;
+
+  function limb(a,b,w,col,dark){
+    ctx.strokeStyle=LINE; ctx.lineWidth=w*a.s+5;
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+    ctx.strokeStyle=shade((a.z+b.z)/2,col,dark); ctx.lineWidth=w*a.s;
+    ctx.beginPath(); ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y); ctx.stroke();
+  }
+  function blob(p,rx,ry,col,dark){
+    ctx.fillStyle=shade(p.z,col,dark); ctx.strokeStyle=LINE; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.ellipse(p.x,p.y,rx*p.s,ry*p.s,0,0,7); ctx.fill(); ctx.stroke();
+  }
+  function shoe(p){
+    blob(p,10,7.5,SHOE,SHOE_D);
+    ctx.fillStyle=SOLE;
+    ctx.beginPath(); ctx.ellipse(p.x,p.y+2.5*p.s,7*p.s,3*p.s,0,0,7); ctx.fill();
+  }
+  function head(p){
+    blob(p,13.5,12.5,HAIR,HAIR_D);
+    ctx.fillStyle='rgba(255,255,255,.35)';
+    ctx.beginPath(); ctx.ellipse(p.x-3*p.s,p.y-4*p.s,6*p.s,4*p.s,-0.4,0,7); ctx.fill();
+    ctx.strokeStyle=HAIR_D; ctx.lineWidth=1.6;
+    for(let i=-1;i<=1;i++){
+      ctx.beginPath();
+      ctx.moveTo(p.x+i*5*p.s,p.y-9*p.s);
+      ctx.lineTo(p.x+i*7*p.s,p.y+7*p.s); ctx.stroke();
+    }
+  }
+  function back(p){
+    // футболка: спина + плечи
+    ctx.fillStyle=shade(p.z,SHIRT,SHIRT_D); ctx.strokeStyle=LINE; ctx.lineWidth=3;
+    ctx.beginPath(); ctx.ellipse(p.x,p.y,25*p.s,21*p.s,0,0,7); ctx.fill(); ctx.stroke();
+    // складка вдоль позвоночника
+    ctx.strokeStyle='rgba(0,0,0,.16)'; ctx.lineWidth=3;
+    ctx.beginPath();
+    ctx.moveTo(p.x,p.y-13*p.s); ctx.lineTo(p.x,p.y+13*p.s); ctx.stroke();
+    // ворот — только когда смотрим в спину
+    if(p.z>0){
+      ctx.strokeStyle='rgba(0,0,0,.22)'; ctx.lineWidth=3;
+      ctx.beginPath(); ctx.arc(p.x,p.y-17*p.s,9*p.s,0.2,Math.PI-0.2); ctx.stroke();
+    }
+  }
+
+  const mid=(a,b)=>(a.z+b.z)/2;
+  const parts=[
+    {z:mid(J.hipL,J.kneeL),  f:()=>limb(J.hipL,J.kneeL,18,PANTS,PANTS_D)},
+    {z:mid(J.hipR,J.kneeR),  f:()=>limb(J.hipR,J.kneeR,18,PANTS,PANTS_D)},
+    {z:mid(J.kneeL,J.footL), f:()=>limb(J.kneeL,J.footL,15,PANTS,PANTS_D)},
+    {z:mid(J.kneeR,J.footR), f:()=>limb(J.kneeR,J.footR,15,PANTS,PANTS_D)},
+    {z:J.footL.z,            f:()=>shoe(J.footL)},
+    {z:J.footR.z,            f:()=>shoe(J.footR)},
+    {z:mid(J.shL,J.handL),   f:()=>limb(J.shL,J.handL,11,SKIN,SKIN_D)},
+    {z:mid(J.shR,J.handR),   f:()=>limb(J.shR,J.handR,11,SKIN,SKIN_D)},
+    {z:J.shL.z+0.1,          f:()=>blob(J.shL,9,8,SHIRT,SHIRT_D)},
+    {z:J.shR.z+0.1,          f:()=>blob(J.shR,9,8,SHIRT,SHIRT_D)},
+    {z:J.head.z,             f:()=>head(J.head)},
+    {z:J.hips.z,             f:()=>blob(J.hips,21,15,PANTS,PANTS_D)},
+    {z:J.torso.z,            f:()=>back(J.torso)}
+  ];
+  parts.sort((a,b)=>a.z-b.z);
+  for(const p of parts) p.f();
+
+  // пыль из-под кувырка — уходит к горизонту
+  ctx.fillStyle='rgba(255,244,226,.14)';
+  for(let i=0;i<5;i++){
+    const k=((i*17+S.t*70)%50)/50;
+    ctx.beginPath();
+    ctx.arc(x+(i%2?1:-1)*(14+k*26), yBase+2-k*22, 10*(1-k)+2, 0,7);
+    ctx.fill();
+  }
+}
+
+/* ---------- кадр ---------- */
+function draw(){
+  ctx.save();
+  if(S.shake>0){
+    ctx.translate((Math.random()-0.5)*14*S.shake,(Math.random()-0.5)*10*S.shake);
+  }
+  drawWorld();
+  const sorted=[...S.items].sort((a,b)=>b.d-a.d);
+  for(const it of sorted) drawItem(it);
+
+  const gk=S.grad/100;
+  const drunkX=Math.sin(S.t*3.1)*gk*14+Math.sin(S.t*7.3)*gk*5;
+  drawSlavik(S.px+drunkX, GROUND, S.roll);
+
+  for(const t of S.toasts){
+    ctx.globalAlpha=Math.max(0,t.life);
+    ctx.fillStyle=t.col; ctx.font='700 22px "Arial Black",sans-serif';
+    ctx.textAlign='center'; ctx.strokeStyle='rgba(0,0,0,.6)'; ctx.lineWidth=4;
+    ctx.strokeText(t.text,t.x,t.y); ctx.fillText(t.text,t.x,t.y);
+    ctx.globalAlpha=1;
+  }
+  // комбо
+  if(S.combo>=3){
+    ctx.fillStyle='rgba(255,194,51,.9)'; ctx.font='700 18px "Arial Black",sans-serif';
+    ctx.textAlign='center'; ctx.fillText('x'+(1+Math.floor(S.grad/25))+'  комбо '+S.combo, CX, GROUND+34);
+  }
+  ctx.restore();
+
+  if(S.flash>0){
+    ctx.globalAlpha=S.flash*0.4; ctx.fillStyle=S.flashCol;
+    ctx.fillRect(0,0,W,H); ctx.globalAlpha=1;
+  }
+  // виньетка «поплыло» на высоком градусе
+  if(gk>0.6){
+    const v=ctx.createRadialGradient(CX,H*0.55,H*0.28,CX,H*0.55,H*0.75);
+    v.addColorStop(0,'rgba(0,0,0,0)'); v.addColorStop(1,'rgba(255,140,40,'+((gk-0.6)*0.55)+')');
+    ctx.fillStyle=v; ctx.fillRect(0,0,W,H);
+  }
+}
+
+function hud(){
+  elScore.firstChild.nodeValue=S.score;
+  elG.style.width=S.grad+'%';
+  let h='';
+  for(let i=0;i<3;i++) h+='<div class="life'+(i<S.lives?'':' off')+'"></div>';
+  elLives.innerHTML=h;
+}
+
+/* ---------- ачивки ---------- */
+const ACH=[
+  {id:'taste',  n:'Дегустатор',        d:'попробовать все четыре вида за один забег',
+   t:s=>s.st.beer&&s.st.nug&&s.st.water&&s.st.steak},
+  {id:'glass',  n:'Стеклотара',        d:'50 девяток за забег',
+   t:s=>s.st.beer>=50},
+  {id:'chick',  n:'Куриный бог',       d:'40 наггетсов за забег',
+   t:s=>s.st.nug>=40},
+  {id:'combo',  n:'Не промахивается',  d:'25 подборов подряд без косяка',
+   t:s=>s.st.maxCombo>=25},
+  {id:'brows',  n:'На бровях',         d:'10 секунд подряд на градусе 100',
+   t:s=>s.st.gradFull>=10},
+  {id:'cork',   n:'Штопор',            d:'150 кувырков за забег',
+   t:s=>s.st.rolls>=150},
+  {id:'zigzag', n:'Виляет как может',  d:'50 смен полосы за забег',
+   t:s=>s.st.lanes>=50},
+  {id:'aqua',   n:'Аквафоб',           d:'60 секунд ни капли воды',
+   t:s=>s.st.dry>=60},
+  {id:'maraf',  n:'Славик-марафонец',  d:'90 секунд на ногах',
+   t:s=>s.t>=90},
+  {id:'clean',  n:'Чистый лист',       d:'500 очков и ни одного стейка',
+   t:s=>s.score>=500&&s.st.noSteak},
+  // а это про смерть — проверяются в момент проигрыша
+  {id:'protein',n:'Умер, но подкачался',d:'слить все три жизни, ни разу не выпив',
+   t:s=>s.dead&&s.st.noBeer},
+  {id:'express',n:'Экспресс-ЗОЖ',      d:'сгореть на трёх стейках за 20 секунд',
+   t:s=>s.dead&&s.t<=20},
+  {id:'sober',  n:'Ушёл трезвым',      d:'погибнуть на нулевом градусе',
+   t:s=>s.dead&&s.grad<=0.5},
+  {id:'crystal',n:'Хрустальный',       d:'проиграть за первые 8 секунд',
+   t:s=>s.dead&&s.t<=8},
+  {id:'vega',   n:'Вегетарианец наоборот',d:'три стейка, не тронув ни одной воды',
+   t:s=>s.dead&&s.st.water===0},
+  {id:'legend', n:'Живая легенда',     d:'2000 очков за один забег',
+   t:s=>s.score>=2000}
+];
+
+let unlocked=new Set();
+function saveAch(){
+  const v=JSON.stringify([...unlocked]);
+  try{ localStorage.setItem('krutoslavik_ach',v); }catch(e){}
+  try{ if(window.storage) window.storage.set('ach',v); }catch(e){}
+}
+async function loadAch(){
+  let raw=null;
+  try{ raw=localStorage.getItem('krutoslavik_ach'); }catch(e){}
+  if(!raw){
+    try{
+      if(window.storage){ const r=await window.storage.get('ach'); if(r&&r.value) raw=r.value; }
+    }catch(e){}
+  }
+  if(raw){ try{ JSON.parse(raw).forEach(x=>unlocked.add(x)); }catch(e){} }
+  try{ best=parseInt(localStorage.getItem('krutoslavik_best')||'0',10)||0; }catch(e){}
+  renderAch();
+}
+function checkAch(){
+  for(const a of ACH){
+    if(unlocked.has(a.id)) continue;
+    let ok=false; try{ ok=!!a.t(S); }catch(e){}
+    if(ok){ unlocked.add(a.id); S.newAch.push(a); popAch(a); saveAch(); renderAch(); }
+  }
+}
+let popQ=[], popBusy=false;
+function popAch(a){ popQ.push(a); if(!popBusy) nextPop(); }
+function nextPop(){
+  const el=document.getElementById('achpop');
+  if(!popQ.length){ popBusy=false; return; }
+  popBusy=true; const a=popQ.shift();
+  el.innerHTML='<em>ачивка</em><b>'+a.n+'</b><i>'+a.d+'</i>';
+  el.classList.add('on');
+  beep(880,0.09,'square',0.05); haptic('ok');
+  setTimeout(()=>beep(1320,0.13,'square',0.05),110);
+  setTimeout(()=>{ el.classList.remove('on'); setTimeout(nextPop,240); },2100);
+}
+function renderAch(){
+  let h='';
+  for(const a of ACH){
+    const got=unlocked.has(a.id);
+    h+='<div class="ac'+(got?' got':'')+'"><div class="m">'+(got?'★':'☆')+
+       '</div><div><b>'+a.n+'</b><span>'+a.d+'</span></div></div>';
+  }
+  document.getElementById('achlist').innerHTML=h;
+  const lab='АЧИВКИ '+unlocked.size+'/'+ACH.length;
+  document.getElementById('btnAch').textContent=lab;
+  document.getElementById('btnAch2').textContent=lab;
+}
+
+/* ---------- звания ----------
+   Сначала ищем что-то характерное в стиле забега. Совпало несколько —
+   берём случайное, но не то же, что в прошлый раз. Ничего не совпало —
+   лестница по очкам. */
+let lastRank='';
+const SPECIAL=[
+  {t:s=>s.score===0,                    x:'Ноль очков. Зато честно.'},
+  {t:s=>s.t<=6,                         x:'Стартовал. Закончил. Всё.'},
+  {t:s=>s.st.beer===0&&s.t>15,          x:'Прокатился всухую. Славик не понял, но осуждает.'},
+  {t:s=>s.st.water>=6,                  x:'Пил воду. Добровольно. Шесть раз.'},
+  {t:s=>s.st.water>=3&&s.st.beer<5,     x:'Кажется, ты играешь не в ту игру'},
+  {t:s=>s.t<=15&&s.st.steak>=3,         x:'Три стейка за пятнадцать секунд. Это был не забег, а шведский стол.'},
+  {t:s=>s.grad<=1,                      x:'Ушёл трезвым. Обиднее не придумаешь.'},
+  {t:s=>s.grad>=92,                     x:'Ушёл на пике. Красиво.'},
+  {t:s=>s.st.lanes<=3&&s.t>20,          x:'Ехал по прямой. Принципиально.'},
+  {t:s=>s.st.lanes>=70,                 x:'Мотало так, что дорога устала'},
+  {t:s=>s.st.beer>=12&&s.st.nug===0,    x:'Пил не закусывая. Классика жанра.'},
+  {t:s=>s.st.nug>=20&&s.st.nug>s.st.beer*2, x:'Пришёл за пивом — остался за наггетсами'},
+  {t:s=>s.st.beer>=20&&s.st.water===0,  x:'Ни капли воды. Дисциплина.'},
+  {t:s=>s.st.maxCombo>=22,              x:'Ни одного лишнего движения. Подозрительно.'},
+  {t:s=>s.st.rolls>=130,                x:'Столько кувырков, что асфальт стёрся'},
+  {t:s=>s.t>=100,                       x:'Славик, тебе домой не надо?'},
+  {t:s=>s.st.gradFull>=8,               x:'Финишировал на автопилоте'},
+  {t:s=>s.score>=600&&s.st.nug===0&&s.st.beer>=15, x:'Диета из одного продукта. Работает.'}
+];
+function ladder(sc){
+  if(sc<60)   return 'Славик только вошёл во вкус';
+  if(sc<150)  return 'Разминка засчитана';
+  if(sc<300)  return 'Стоит на ногах. Пока стоит.';
+  if(sc<500)  return 'Уверенный середнячок двора';
+  if(sc<800)  return 'Кандидат в мастера по кувыркам';
+  if(sc<1200) return 'Мастер спорта по кувыркам';
+  if(sc<1800) return 'Легенда пивного ларька';
+  if(sc<2600) return 'Земля вращается вокруг Славика';
+  if(sc<4000) return 'Славику ставят памятник у гаражей';
+  return 'КРУТОСЛАВИК. Ты сломал физику.';
+}
+function rank(s){
+  const hit=SPECIAL.filter(r=>{ try{ return !!r.t(s); }catch(e){ return false; } })
+                   .map(r=>r.x);
+  let pick;
+  if(hit.length){
+    pick=hit[Math.floor(Math.random()*hit.length)];
+    if(hit.length>1 && pick===lastRank)
+      pick=hit[(hit.indexOf(pick)+1)%hit.length];
+  } else {
+    pick=ladder(s.score);
+  }
+  lastRank=pick;
+  return pick;
+}
+
+/* ---------- цикл ---------- */
+let last=0;
+function loop(ts){
+  const dt=Math.min(0.05,(ts-last)/1000||0); last=ts;
+  if(running && !paused){ update(dt); }
+  if(S) { draw(); hud(); }
+  requestAnimationFrame(loop);
+}
+
+function start(){
+  reset(); running=true; paused=false; popQ.length=0;
+  scStart.classList.add('hide'); scOver.classList.add('hide');
+  scAch.classList.add('hide'); scPause.classList.add('hide');
+  document.getElementById('pausebtn').textContent='❚❚';
+  beep(440,0.08,'square',0.05);
+}
+const scPause=document.getElementById('pause');
+function setPause(v){
+  if(!running) return;
+  paused=v;
+  scPause.classList.toggle('hide',!v);
+  document.getElementById('pausebtn').textContent = v ? '▶' : '❚❚';
+}
+function toMenu(){
+  running=false; paused=false;
+  scPause.classList.add('hide'); scOver.classList.add('hide'); scAch.classList.add('hide');
+  scStart.classList.remove('hide');
+  document.getElementById('pausebtn').textContent='❚❚';
+  reset();
+}
+document.getElementById('pausebtn').onclick=e=>{ setPause(!paused); e.currentTarget.blur(); };
+document.getElementById('btnResume').onclick=()=>setPause(false);
+document.getElementById('btnMenu').onclick=toMenu;
+document.getElementById('btnMenu2').onclick=toMenu;
+function gameOver(){
+  running=false;
+  S.dead=true; checkAch();
+  best=Math.max(best,S.score);
+  try{ localStorage.setItem('krutoslavik_best',String(best)); }catch(e){}
+  elRank.textContent=rank(S);
+  elFinal.firstChild.nodeValue=S.score;
+  elBest.textContent='лучший забег: '+best;
+  const st=S.st;
+  document.getElementById('runstats').innerHTML=
+    'девяток <b>'+st.beer+'</b> · наггетсов <b>'+st.nug+'</b> · '+
+    'стейков <b>'+st.steak+'</b> · воды <b>'+st.water+'</b><br>'+
+    'кувырков <b>'+st.rolls+'</b> · продержался <b>'+Math.round(S.t)+'</b> сек';
+  document.getElementById('newach').innerHTML =
+    S.newAch.length ? S.newAch.map(a=>'<div>★ '+a.n+'</div>').join('') : '';
+  scOver.classList.remove('hide');
+  beep(200,0.2,'sawtooth',0.07);
+  setTimeout(()=>beep(120,0.4,'sawtooth',0.07),180);
+}
+document.getElementById('btn1').onclick=start;
+document.getElementById('btn2').onclick=start;
+const scAch=document.getElementById('achs');
+let achFrom=scStart;
+function openAch(from){ achFrom=from; from.classList.add('hide'); scAch.classList.remove('hide'); }
+document.getElementById('btnAch').onclick=()=>openAch(scStart);
+document.getElementById('btnAch2').onclick=()=>openAch(scOver);
+document.getElementById('btnBack').onclick=()=>{
+  scAch.classList.add('hide'); achFrom.classList.remove('hide');
+};
+
+reset(); running=false;
+document.querySelectorAll('.ic').forEach(cn=>paintIcon(cn,cn.dataset.t));
+loadAch();
+requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
